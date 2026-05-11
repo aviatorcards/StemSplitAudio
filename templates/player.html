@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Player – {{ title }}</title>
+  <!-- Tone.js served locally — no internet required -->
+  <script src="/static/tone.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #eef2f7;
+      color: #222;
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .page { max-width: 820px; margin: 0 auto; padding: 0 16px 60px; }
+
+    .topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 0 12px;
+      border-bottom: 1px solid #dde3ed;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      color: #2563eb; text-decoration: none; font-weight: 600;
+      font-size: 1rem; white-space: nowrap;
+      padding: 6px 14px; border: 1px solid #bfdbfe;
+      border-radius: 8px; background: #eff6ff;
+      transition: background .15s;
+    }
+    .back-link:hover { background: #dbeafe; }
+    .file-title {
+      font-size: 1rem; font-weight: 600; color: #334155;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 22px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      margin-bottom: 18px;
+    }
+
+    .waveform-wrap {
+      position: relative; background: #f1f5f9;
+      border-radius: 10px; overflow: hidden;
+      cursor: crosshair; height: 110px;
+    }
+    #waveform-canvas { display: block; width: 100%; height: 110px; }
+    .loading-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #f1f5f9; font-size: 1rem; color: #64748b;
+    }
+
+    .transport-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 14px; gap: 12px; flex-wrap: wrap;
+    }
+    .transport-btns { display: flex; align-items: center; gap: 10px; }
+
+    .btn-icon {
+      width: 44px; height: 44px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      border-radius: 50%; font-size: 1.1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .btn-icon:hover { background: #e2e8f0; }
+
+    .btn-play {
+      padding: 0 28px; height: 52px;
+      background: #2563eb; color: #fff;
+      border: none; border-radius: 26px;
+      font-size: 1.1rem; font-weight: 700;
+      cursor: pointer; letter-spacing: .3px;
+      transition: background .15s, transform .1s;
+      min-width: 130px;
+    }
+    .btn-play:hover  { background: #1d4ed8; }
+    .btn-play:active { transform: scale(.98); }
+    .btn-play.playing { background: #0f172a; }
+
+    .time-display {
+      font-size: 1.05rem; font-weight: 600;
+      color: #475569; font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .time-sep { color: #94a3b8; margin: 0 2px; }
+
+    .kbd-hint { font-size: .82rem; color: #94a3b8; text-align: center; margin-top: 6px; }
+    kbd {
+      display: inline-block; padding: 1px 6px;
+      border: 1px solid #cbd5e1; border-radius: 4px;
+      font-family: inherit; background: #f8fafc; font-size: .82rem;
+    }
+
+    .control-group { margin-bottom: 22px; }
+    .control-group:last-child { margin-bottom: 0; }
+
+    .control-label {
+      font-weight: 700; font-size: 1rem;
+      color: #1e293b; margin-bottom: 3px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .val-badge {
+      font-size: .85rem; font-weight: 600;
+      color: #2563eb; background: #dbeafe;
+      padding: 2px 10px; border-radius: 10px;
+    }
+    .val-badge.modified { background: #fef3c7; color: #92400e; }
+
+    .control-hint { font-size: .88rem; color: #64748b; margin-bottom: 10px; }
+    .control-hint.warn { color: #92400e; }
+
+    .slider {
+      -webkit-appearance: none; width: 100%; height: 8px;
+      background: #e2e8f0; border-radius: 4px; outline: none; cursor: pointer;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 24px; height: 24px;
+      background: #2563eb; border-radius: 50%; cursor: pointer;
+      border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+      transition: background .15s, transform .1s;
+    }
+    .slider::-webkit-slider-thumb:hover { background: #1d4ed8; transform: scale(1.1); }
+    .slider::-moz-range-thumb {
+      width: 24px; height: 24px; background: #2563eb;
+      border-radius: 50%; cursor: pointer;
+      border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    }
+    .slider:disabled { opacity: .4; cursor: not-allowed; }
+    .slider:disabled::-webkit-slider-thumb { cursor: not-allowed; transform: none; }
+
+    .range-ends { display: flex; justify-content: space-between; font-size: .8rem; color: #94a3b8; margin-top: 4px; }
+
+    .loop-hint {
+      font-size: .9rem; color: #475569;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+    }
+    .loop-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .btn-loop {
+      padding: 10px 22px; background: #f1f5f9; color: #334155;
+      border: 2px solid #cbd5e1; border-radius: 8px;
+      font-size: .95rem; font-weight: 700; cursor: pointer; transition: all .15s;
+    }
+    .btn-loop:hover { background: #e2e8f0; }
+    .btn-loop.active { background: #ede9fe; color: #5b21b6; border-color: #a78bfa; }
+
+    .btn-clear {
+      padding: 10px 18px; background: #fff; color: #64748b;
+      border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: .9rem; cursor: pointer; transition: background .15s;
+    }
+    .btn-clear:hover { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <a href="/" class="back-link">← Files</a>
+    <span class="file-title" title="{{ filename }}">{{ title }}</span>
+  </div>
+
+  <div class="card">
+    <div class="waveform-wrap" id="waveform-wrap">
+      <canvas id="waveform-canvas" height="110"></canvas>
+      <div class="loading-overlay" id="loading-overlay">Loading audio…</div>
+    </div>
+
+    <div class="transport-row">
+      <div class="transport-btns">
+        <button class="btn-icon" id="btn-restart" title="Restart (Home)">⏮</button>
+        <button class="btn-play" id="btn-play">▶&nbsp; Play</button>
+        <button class="btn-icon" id="btn-end" title="Jump to end">⏭</button>
+      </div>
+      <div class="time-display">
+        <span id="cur-time">0:00</span><span class="time-sep"> / </span><span id="tot-time">0:00</span>
+      </div>
+    </div>
+    <div class="kbd-hint">
+      <kbd>Space</kbd> play/pause &nbsp;·&nbsp; <kbd>Home</kbd> restart &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> seek 5 s
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="control-group">
+      <div class="control-label">
+        Speed <span class="val-badge" id="tempo-badge">Normal (1.00×)</span>
+      </div>
+      <div class="control-hint">Slow down or speed up — pitch stays the same.</div>
+      <input class="slider" type="range" id="tempo-range" min="40" max="150" value="100" step="1">
+      <div class="range-ends"><span>½ speed</span><span>Normal</span><span>1½×</span></div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        Pitch <span class="val-badge" id="pitch-badge">Original key</span>
+      </div>
+      <div class="control-hint" id="pitch-hint">Raise or lower the key without affecting playback speed.</div>
+      <input class="slider" type="range" id="pitch-range" min="-12" max="12" value="0" step="1">
+      <div class="range-ends"><span>Lower (−12)</span><span>Original</span><span>Higher (+12)</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="control-label" style="margin-bottom:10px;">Loop</div>
+    <div class="loop-hint" id="loop-hint">
+      Click and drag on the waveform to mark a section, then press <strong>Enable Loop</strong>.
+    </div>
+    <div class="loop-btns">
+      <button class="btn-loop" id="btn-loop">Enable Loop</button>
+      <button class="btn-clear" id="btn-clear">Clear selection</button>
+    </div>
+  </div>
+
+</div>
+<script>
+'use strict';
+
+// ─── How this works ───────────────────────────────────────────────────────────
+//
+// SPEED (tempo) control:
+//   HTMLAudioElement.playbackRate  +  preservesPitch = true
+//   The browser's built-in WSOLA time-stretcher changes the tempo WITHOUT
+//   changing the pitch. This is the correct, native approach.
+//
+// PITCH control:
+//   Tone.js PitchShift (phase vocoder, served locally from /static/tone.js).
+//   The audio element output is captured via createMediaElementSource() and
+//   routed through PitchShift → Tone.js destination.
+//   Tone.connect(mediaSrc, pitchShifter) is the correct cross-system API;
+//   mediaSrc.connect(pitchShifter.input) does NOT work because Tone.js nodes
+//   are not native AudioNodes.
+//
+// Both controls are genuinely independent.
+
+const FILENAME = {{ filename | tojson }};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const audioEl = new Audio();
+audioEl.preservesPitch       = true;  // Chrome / Edge
+audioEl.webkitPreservesPitch = true;  // Safari
+audioEl.mozPreservesPitch    = true;  // old Firefox
+
+let audioBuf     = null;   // AudioBuffer for waveform drawing only
+let isPlaying    = false;
+let audioReady   = false;  // Web Audio graph initialised (requires user gesture)
+let pitchShifter = null;   // Tone.PitchShift or null
+
+let tempo = 1.0;
+let semis = 0;
+let loopOn = false, loopA = null, loopB = null;
+
+let waveCache = null, dragging = false, dragX0 = 0, animFrame = null;
+
+// ─── Load ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  setupCanvas();
+  setupControls();
+  setupKeys();
+
+  const encodedPath = FILENAME.split('/').map(encodeURIComponent).join('/');
+  const fileUrl = '/files/' + encodedPath;
+
+  // Audio element streams the file — no full decode needed for playback
+  audioEl.src = fileUrl;
+  audioEl.addEventListener('ended', onEnded);
+
+  // Fetch the same file a second time just to decode PCM for the waveform
+  try {
+    const res = await fetch(fileUrl);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = await res.arrayBuffer();
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioBuf = await tmpCtx.decodeAudioData(raw);
+    await tmpCtx.close();
+    document.getElementById('tot-time').textContent = fmtTime(audioBuf.duration);
+    buildWaveform();
+    hideLoading();
+  } catch (err) {
+    audioEl.addEventListener('loadedmetadata', () => {
+      document.getElementById('tot-time').textContent = fmtTime(audioEl.duration);
+    });
+    hideLoading();
+    console.warn('Waveform decode failed:', err);
+  }
+});
+
+// ─── Web Audio / Tone.js init (must be inside a user gesture) ─────────────────
+async function ensureAudioReady() {
+  if (audioReady) return;
+  audioReady = true;
+
+  // If Tone.js failed to load (unlikely — it's served locally), fall back to
+  // pure native playback. preservesPitch still works; only pitch shift is lost.
+  if (typeof Tone === 'undefined') {
+    disablePitch('Tone.js did not load — pitch shift unavailable.');
+    return;
+  }
+
+  // Step 1: Start Tone.js AudioContext and capture the audio element.
+  // These two steps are separated so we can always connect mediaSrc to
+  // *something* if pitch shift setup later fails (silence is worse than no pitch).
+  let rawCtx, mediaSrc;
+  try {
+    await Tone.start();
+    rawCtx  = Tone.getContext().rawContext;
+    mediaSrc = rawCtx.createMediaElementSource(audioEl);
+  } catch (err) {
+    // Context or capture failed — audio plays natively, preservesPitch works.
+    console.error('Audio context init failed:', err);
+    disablePitch('Audio setup failed — pitch shift unavailable.');
+    return;
+  }
+
+  // Step 2: Attach the pitch shifter. If this fails, connect mediaSrc directly
+  // so the audio is never lost to silence.
+  try {
+    pitchShifter = new Tone.PitchShift({ pitch: semis });
+    pitchShifter.toDestination();
+
+    // Tone.connect() handles the cross-system connection between a native
+    // AudioNode (mediaSrc) and a Tone.js node (pitchShifter).
+    // DO NOT use mediaSrc.connect(pitchShifter.input) — Tone nodes are not
+    // native AudioNodes and that call silently fails.
+    Tone.connect(mediaSrc, pitchShifter);
+
+  } catch (err) {
+    console.error('PitchShift setup failed:', err);
+    pitchShifter = null;
+    // mediaSrc is captured — must connect it or audio goes silent
+    mediaSrc.connect(rawCtx.destination);
+    disablePitch('Pitch shift setup failed — speed control still works.');
+  }
+}
+
+function disablePitch(msg) {
+  const hint = document.getElementById('pitch-hint');
+  hint.textContent = msg;
+  hint.classList.add('warn');
+  document.getElementById('pitch-range').disabled = true;
+}
+
+// ─── Playback ─────────────────────────────────────────────────────────────────
+async function togglePlay() {
+  await ensureAudioReady();
+  if (isPlaying) {
+    audioEl.pause();
+    isPlaying = false;
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+  } else {
+    try {
+      await audioEl.play();
+      isPlaying = true;
+      animFrame = requestAnimationFrame(tick);
+    } catch (e) { console.warn('play() blocked:', e); }
+  }
+  updatePlayBtn();
+}
+
+function restart() {
+  const was = isPlaying;
+  if (isPlaying) { audioEl.pause(); isPlaying = false; }
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+  audioEl.currentTime = (loopOn && loopA !== null) ? loopA : 0;
+  if (was) {
+    audioEl.play().then(() => { isPlaying = true; updatePlayBtn(); animFrame = requestAnimationFrame(tick); });
+  } else {
+    drawOverlay(audioEl.currentTime);
+    updateTime(audioEl.currentTime);
+  }
+}
+
+function seekTo(t) {
+  const dur = audioBuf ? audioBuf.duration : (audioEl.duration || 0);
+  audioEl.currentTime = Math.max(0, Math.min(t, dur));
+  if (!isPlaying) { drawOverlay(audioEl.currentTime); updateTime(audioEl.currentTime); }
+}
+
+function seekBy(dt) { seekTo(audioEl.currentTime + dt); }
+
+function onEnded() {
+  isPlaying = false;
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+  updatePlayBtn();
+  drawOverlay(0); updateTime(0);
+}
+
+// ─── Animation loop ───────────────────────────────────────────────────────────
+function tick() {
+  const pos = audioEl.currentTime;
+  if (loopOn && loopA !== null && loopB !== null && pos >= loopB) {
+    audioEl.currentTime = loopA;
+  }
+  drawOverlay(audioEl.currentTime);
+  updateTime(audioEl.currentTime);
+  if (isPlaying) animFrame = requestAnimationFrame(tick);
+}
+
+// ─── Waveform ─────────────────────────────────────────────────────────────────
+function setupCanvas() {
+  const wrap = document.getElementById('waveform-wrap');
+  const canvas = document.getElementById('waveform-canvas');
+  function resize() { canvas.width = wrap.clientWidth; if (audioBuf) buildWaveform(); }
+  resize();
+  window.addEventListener('resize', resize);
+  canvas.addEventListener('mousedown',  onDown);
+  canvas.addEventListener('mousemove',  onMove);
+  canvas.addEventListener('mouseup',    onUp);
+  canvas.addEventListener('mouseleave', onUp);
+  canvas.addEventListener('touchstart', e => onDown(e.touches[0]),          { passive: true });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
+  canvas.addEventListener('touchend',   e => onUp(e.changedTouches[0]));
+}
+
+function buildWaveform() {
+  const canvas = document.getElementById('waveform-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f1f5f9'; ctx.fillRect(0, 0, W, H);
+  if (!audioBuf) return;
+  const data = audioBuf.getChannelData(0);
+  const step = data.length / W, mid = H / 2;
+  for (let x = 0; x < W; x++) {
+    let lo = 0, hi = 0;
+    const s = Math.floor(x * step), e = Math.floor((x + 1) * step);
+    for (let i = s; i < e; i++) { if (data[i] < lo) lo = data[i]; if (data[i] > hi) hi = data[i]; }
+    const a = (hi - lo) * 0.5;
+    ctx.fillStyle = `rgb(${~~(147+(29-147)*a)},${~~(197+(78-197)*a)},${~~(253+(216-253)*a)})`;
+    ctx.fillRect(x, mid - hi * mid, 1, Math.max(1, (hi - lo) * mid));
+  }
+  waveCache = ctx.getImageData(0, 0, W, H);
+}
+
+function drawOverlay(pos) {
+  const canvas = document.getElementById('waveform-canvas');
+  if (!canvas.width) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const dur = audioBuf ? audioBuf.duration : (audioEl.duration || 1);
+  if (waveCache) ctx.putImageData(waveCache, 0, 0);
+  const px = (pos / dur) * W;
+  ctx.fillStyle = 'rgba(37,99,235,0.13)'; ctx.fillRect(0, 0, px, H);
+  if (loopA !== null && loopB !== null && loopB > loopA) {
+    const lx = (loopA / dur) * W, lw = ((loopB - loopA) / dur) * W;
+    ctx.fillStyle = loopOn ? 'rgba(109,40,217,0.2)' : 'rgba(109,40,217,0.1)';
+    ctx.fillRect(lx, 0, lw, H);
+    ctx.strokeStyle = loopOn ? '#7c3aed' : '#a78bfa'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx + .75, .75, Math.max(0, lw - 1.5), H - 1.5);
+  }
+  ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+  ctx.fillStyle = '#1d4ed8';
+  ctx.beginPath(); ctx.moveTo(px-6,0); ctx.lineTo(px+6,0); ctx.lineTo(px,10); ctx.closePath(); ctx.fill();
+}
+
+function xToTime(cx) {
+  const canvas = document.getElementById('waveform-canvas');
+  const rect = canvas.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (cx - rect.left) / rect.width)) * (audioBuf ? audioBuf.duration : (audioEl.duration || 0));
+}
+
+function onDown(e) {
+  if (!audioBuf && !audioEl.duration) return;
+  dragging = true; dragX0 = e.clientX;
+  loopA = xToTime(e.clientX); loopB = loopA;
+}
+function onMove(e) {
+  if (!dragging) return;
+  const t = xToTime(e.clientX), o = xToTime(dragX0);
+  loopA = Math.min(t, o); loopB = Math.max(t, o);
+  drawOverlay(audioEl.currentTime);
+}
+function onUp(e) {
+  if (!dragging) return; dragging = false;
+  const t = xToTime(e.clientX), o = xToTime(dragX0);
+  if (Math.abs(t - o) < 0.15) {
+    loopA = null; loopB = null; seekTo(xToTime(e.clientX)); updateLoopHint();
+  } else {
+    loopA = Math.min(t, o); loopB = Math.max(t, o); updateLoopHint();
+  }
+  drawOverlay(audioEl.currentTime);
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+function setupControls() {
+  document.getElementById('btn-play').addEventListener('click', togglePlay);
+  document.getElementById('btn-restart').addEventListener('click', restart);
+  document.getElementById('btn-end').addEventListener('click', () => {
+    seekTo((audioBuf ? audioBuf.duration : audioEl.duration) - 0.05);
+  });
+
+  document.getElementById('tempo-range').addEventListener('input', function () {
+    tempo = parseInt(this.value) / 100;
+    audioEl.playbackRate = tempo;  // preservesPitch keeps pitch constant
+    const b = document.getElementById('tempo-badge');
+    b.textContent = tempo === 1 ? 'Normal (1.00×)' : Math.round(tempo * 100) + '%';
+    b.className   = 'val-badge' + (tempo !== 1 ? ' modified' : '');
+  });
+
+  document.getElementById('pitch-range').addEventListener('input', function () {
+    semis = parseInt(this.value);
+    if (pitchShifter) pitchShifter.pitch = semis;
+    const sign = semis > 0 ? '+' : '';
+    const b = document.getElementById('pitch-badge');
+    b.textContent = semis === 0 ? 'Original key' : sign + semis + ' semitone' + (Math.abs(semis) !== 1 ? 's' : '');
+    b.className = 'val-badge' + (semis !== 0 ? ' modified' : '');
+  });
+
+  document.getElementById('btn-loop').addEventListener('click', () => {
+    if (loopA === null || loopB === null || loopB - loopA < 0.15) {
+      alert('Drag on the waveform first to select a section.');
+      return;
+    }
+    loopOn = !loopOn;
+    document.getElementById('btn-loop').textContent = loopOn ? 'Disable Loop' : 'Enable Loop';
+    document.getElementById('btn-loop').classList.toggle('active', loopOn);
+    updateLoopHint();
+    if (loopOn && (audioEl.currentTime < loopA || audioEl.currentTime >= loopB)) seekTo(loopA);
+    drawOverlay(audioEl.currentTime);
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    loopOn = false; loopA = null; loopB = null;
+    document.getElementById('btn-loop').textContent = 'Enable Loop';
+    document.getElementById('btn-loop').classList.remove('active');
+    updateLoopHint(); drawOverlay(audioEl.currentTime);
+  });
+}
+
+function setupKeys() {
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if      (e.key === ' ')          { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'Home')       { e.preventDefault(); restart(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); seekBy(5); }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); seekBy(-5); }
+  });
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function updatePlayBtn() {
+  const btn = document.getElementById('btn-play');
+  btn.textContent = isPlaying ? '⏸  Pause' : '▶  Play';
+  btn.classList.toggle('playing', isPlaying);
+}
+function updateTime(pos) { document.getElementById('cur-time').textContent = fmtTime(pos); }
+function updateLoopHint() {
+  const el = document.getElementById('loop-hint');
+  if (!loopA && loopA !== 0)
+    el.innerHTML = 'Click and drag on the waveform to mark a section, then press <strong>Enable Loop</strong>.';
+  else if (loopOn)
+    el.innerHTML = 'Looping <strong>' + fmtTime(loopA) + '</strong> → <strong>' + fmtTime(loopB) + '</strong>';
+  else
+    el.innerHTML = 'Selection: <strong>' + fmtTime(loopA) + '</strong> → <strong>' + fmtTime(loopB) + '</strong> — press Enable Loop to activate.';
+}
+function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+function fmtTime(s) {
+  s = Math.max(0, s || 0);
+  return Math.floor(s / 60) + ':' + Math.floor(s % 60).toString().padStart(2, '0');
+}
+</script>
+</body>
+</html>

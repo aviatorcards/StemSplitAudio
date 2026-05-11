@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #eef2f7;
+      color: #222;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 36px 20px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    header h1 { font-size: 2.4rem; color: #1a1a2e; margin-bottom: 6px; }
+    header p  { color: #666; font-size: 1.1rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 30px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 22px;
+    }
+
+    /* ── URL input ── */
+    .url-label {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 10px;
+      display: block;
+    }
+    #url-input {
+      width: 100%;
+      padding: 15px 18px;
+      font-size: 1.1rem;
+      border: 2px solid #d0d7e3;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    #url-input:focus { border-color: #3b82f6; }
+    #url-input::placeholder { color: #aaa; }
+
+    /* ── Format ── */
+    .section-label {
+      font-weight: 700;
+      color: #333;
+      margin: 22px 0 10px;
+      display: block;
+    }
+    .format-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .format-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 22px;
+      border: 2px solid #d0d7e3;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all .15s;
+      user-select: none;
+    }
+    .format-pill:hover { border-color: #3b82f6; background: #eff6ff; }
+    .format-pill.active { border-color: #3b82f6; background: #dbeafe; color: #1d4ed8; }
+    .format-pill input { display: none; }
+
+    /* ── Stem section ── */
+    .stem-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-top: 22px;
+    }
+    .stem-toggle-row {
+      display: flex; align-items: center; gap: 12px; cursor: pointer;
+    }
+    .big-checkbox {
+      width: 22px; height: 22px; cursor: pointer;
+      accent-color: #3b82f6;
+      flex-shrink: 0;
+    }
+    .stem-toggle-label { font-weight: 700; font-size: 1rem; }
+    .stem-note {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: #92400e;
+      background: #fef3c7;
+      border-radius: 6px;
+      padding: 7px 12px;
+    }
+    .stem-modes {
+      display: none;
+      margin-top: 14px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 14px;
+    }
+    .stem-modes.visible { display: block; }
+    .stem-modes p { font-weight: 600; font-size: .95rem; margin-bottom: 8px; }
+    .stem-option {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 9px 10px; border-radius: 8px; cursor: pointer;
+      margin-bottom: 4px;
+    }
+    .stem-option:hover { background: #f1f5f9; }
+    .stem-option input { margin-top: 3px; accent-color: #3b82f6; width: 17px; height: 17px; }
+    .stem-option strong { display: block; font-size: .98rem; }
+    .stem-option small { color: #666; font-size: .85rem; }
+
+    /* ── Download button ── */
+    #download-btn {
+      display: block; width: 100%;
+      margin-top: 24px;
+      padding: 17px;
+      font-size: 1.25rem; font-weight: 700;
+      color: #fff; background: #2563eb;
+      border: none; border-radius: 10px;
+      cursor: pointer; letter-spacing: .3px;
+      transition: background .15s, transform .1s;
+    }
+    #download-btn:hover:not(:disabled) { background: #1d4ed8; }
+    #download-btn:active:not(:disabled) { transform: scale(.99); }
+    #download-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    /* ── Status card ── */
+    #status-card { display: none; }
+
+    .spinner {
+      display: inline-block;
+      width: 22px; height: 22px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-label { font-weight: 700; font-size: 1.1rem; vertical-align: middle; }
+    .progress-line {
+      margin-top: 10px;
+      font-size: .88rem;
+      font-family: 'Courier New', monospace;
+      color: #555;
+      word-break: break-all;
+      min-height: 22px;
+      background: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+    .status-done  { color: #15803d; font-weight: 700; font-size: 1.15rem; }
+    .status-error { color: #dc2626; font-weight: 600; }
+
+    /* ── Files section ── */
+    #files-section { display: none; }
+    .files-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .files-header h2 { font-size: 1.3rem; }
+    .refresh-btn {
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 7px 16px; border-radius: 8px;
+      font-size: .9rem; cursor: pointer; color: #555;
+    }
+    .refresh-btn:hover { background: #e2e8f0; }
+
+    .file-list { list-style: none; }
+    .file-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 0; border-bottom: 1px solid #f1f5f9;
+      gap: 12px;
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .file-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .file-name-text {
+      font-size: .98rem; word-break: break-word;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .stem-badge {
+      font-size: .7rem; padding: 2px 8px;
+      background: #dbeafe; color: #1d4ed8;
+      border-radius: 10px; font-weight: 700;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    .file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .player-btn {
+      padding: 8px 14px;
+      background: #f0fdf4; color: #15803d;
+      border: 1px solid #86efac;
+      border-radius: 7px;
+      font-size: .9rem; font-weight: 600;
+      text-decoration: none; white-space: nowrap;
+      transition: background .15s;
+    }
+    .player-btn:hover { background: #dcfce7; }
+    .save-btn {
+      padding: 8px 14px;
+      background: #eff6ff; color: #2563eb;
+      border: 1px solid #bfdbfe;
+      border-radius: 7px;
+      font-size: .9rem; font-weight: 600;
+      text-decoration: none; white-space: nowrap;
+      transition: background .15s;
+    }
+    .save-btn:hover { background: #dbeafe; }
+    .del-btn {
+      padding: 8px 12px;
+      background: #fff; color: #dc2626;
+      border: 1px solid #fca5a5;
+      border-radius: 7px;
+      font-size: .9rem; cursor: pointer;
+      transition: background .15s;
+    }
+    .del-btn:hover { background: #fef2f2; }
+
+    .empty-msg { text-align: center; color: #aaa; padding: 24px 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>🎵 Audio Downloader</h1>
+    <p>Download audio from YouTube and other video sites</p>
+  </header>
+
+  <!-- Main form card -->
+  <div class="card">
+    <label class="url-label" for="url-input">Paste a video link</label>
+    <input id="url-input" type="url"
+           placeholder="https://www.youtube.com/watch?v=..."
+           autocomplete="off" autocorrect="off" spellcheck="false">
+
+    <span class="section-label">Audio format</span>
+    <div class="format-row">
+      <label class="format-pill active"><input type="radio" name="fmt" value="mp3" checked> MP3</label>
+      <label class="format-pill"><input type="radio" name="fmt" value="wav"> WAV</label>
+      <label class="format-pill"><input type="radio" name="fmt" value="flac"> FLAC</label>
+    </div>
+
+    {% if demucs_available %}
+    <div class="stem-box">
+      <label class="stem-toggle-row" for="split-stems">
+        <input type="checkbox" id="split-stems" class="big-checkbox">
+        <span class="stem-toggle-label">Split into stems (vocals, instruments…)</span>
+      </label>
+      <div class="stem-note">
+        ⏱&nbsp; Stem splitting takes 5–15 minutes per song on this computer — best to start and walk away.
+      </div>
+      <div class="stem-modes" id="stem-modes">
+        <p>What to split into:</p>
+        <label class="stem-option">
+          <input type="radio" name="stem_mode" value="two" checked>
+          <div>
+            <strong>Vocals &amp; Backing track</strong>
+            <small>Two files: one with just the voice, one with everything else</small>
+          </div>
+        </label>
+        <label class="stem-option">
+          <input type="radio" name="stem_mode" value="all">
+          <div>
+            <strong>4 stems</strong>
+            <small>Vocals, drums, bass, and other instruments</small>
+          </div>
+        </label>
+        <label class="stem-option">
+          <input type="radio" name="stem_mode" value="six">
+          <div>
+            <strong>6 stems</strong>
+            <small>Vocals, drums, bass, guitar, piano, and other — takes longer</small>
+          </div>
+        </label>
+      </div>
+    </div>
+    {% endif %}
+
+    <button id="download-btn" onclick="startDownload()">Download Audio</button>
+  </div>
+
+  <!-- Status card -->
+  <div class="card" id="status-card">
+    <div id="status-content"></div>
+  </div>
+
+  <!-- Files card -->
+  <div class="card" id="files-section">
+    <div class="files-header">
+      <h2>Your Files</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="refresh-btn" onclick="loadFiles()">↻ Refresh</button>
+        <button class="refresh-btn" style="color:#dc2626;border-color:#fca5a5;" onclick="deleteAllStems()">🗑 All Stems</button>
+      </div>
+    </div>
+    <ul class="file-list" id="file-list">
+      <li class="empty-msg">No files yet</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  let currentTaskId = null;
+  let pollTimer = null;
+
+  // Format pill selection
+  document.querySelectorAll('input[name="fmt"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('.format-pill').forEach(p => p.classList.remove('active'));
+      r.closest('.format-pill').classList.add('active');
+    });
+  });
+
+  // Stem checkbox toggle
+  const stemCheck = document.getElementById('split-stems');
+  const stemModes = document.getElementById('stem-modes');
+  if (stemCheck) {
+    stemCheck.addEventListener('change', () => {
+      stemModes.classList.toggle('visible', stemCheck.checked);
+    });
+  }
+
+  // Enter key in URL field
+  document.getElementById('url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startDownload();
+  });
+
+  // ─── Download ───────────────────────────────────────────────────────────────
+
+  async function startDownload() {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) { alert('Please paste a video URL first.'); return; }
+
+    const fmt       = document.querySelector('input[name="fmt"]:checked')?.value || 'mp3';
+    const splitSt   = stemCheck?.checked || false;
+    const stemMode  = document.querySelector('input[name="stem_mode"]:checked')?.value || 'two';
+
+    const btn = document.getElementById('download-btn');
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+
+    if (pollTimer) clearInterval(pollTimer);
+    showStatus('working', 'Starting…');
+
+    try {
+      const res  = await fetch('/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, format: fmt, split_stems: splitSt, stem_mode: stemMode })
+      });
+      const data = await res.json();
+
+      if (data.error) { showStatus('error', data.error); resetBtn(); return; }
+
+      currentTaskId = data.task_id;
+      pollTimer = setInterval(pollStatus, 1200);
+
+    } catch (err) {
+      showStatus('error', 'Could not connect to the app. Is it still running?');
+      resetBtn();
+    }
+  }
+
+  async function pollStatus() {
+    if (!currentTaskId) return;
+    try {
+      const res  = await fetch('/status/' + currentTaskId);
+      const task = await res.json();
+
+      if (task.status === 'done') {
+        clearInterval(pollTimer);
+        showStatus('done', '');
+        resetBtn();
+        loadFiles();
+      } else if (task.status === 'error') {
+        clearInterval(pollTimer);
+        showStatus('error', task.error || 'Something went wrong.');
+        resetBtn();
+      } else {
+        const label = task.status === 'splitting' ? 'Splitting stems…' : 'Downloading…';
+        showStatus('working', task.progress || '', label);
+      }
+    } catch (_) { /* ignore transient */ }
+  }
+
+  function showStatus(type, msg, label) {
+    const card    = document.getElementById('status-card');
+    const content = document.getElementById('status-content');
+    card.style.display = 'block';
+
+    if (type === 'done') {
+      content.innerHTML = `<div class="status-done">✓ &nbsp;Download complete! Your file is ready below.</div>`;
+    } else if (type === 'error') {
+      content.innerHTML = `<div class="status-error">✗ &nbsp;${esc(msg)}</div>`;
+    } else {
+      content.innerHTML = `
+        <div><span class="spinner"></span><span class="status-label">${esc(label || 'Working…')}</span></div>
+        <div class="progress-line">${esc(msg)}</div>`;
+    }
+  }
+
+  function resetBtn() {
+    const btn = document.getElementById('download-btn');
+    btn.disabled = false;
+    btn.textContent = 'Download Audio';
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─── Files ──────────────────────────────────────────────────────────────────
+
+  async function loadFiles() {
+    try {
+      const res   = await fetch('/files');
+      const files = await res.json();
+
+      const section = document.getElementById('files-section');
+      const list    = document.getElementById('file-list');
+      section.style.display = 'block';
+
+      if (!files.length) {
+        list.innerHTML = '<li class="empty-msg">No files downloaded yet</li>';
+        return;
+      }
+
+      list.innerHTML = files.map(f => {
+        const href = '/files/' + f.path.split('/').map(encodeURIComponent).join('/');
+        return `
+          <li class="file-item">
+            <div class="file-info">
+              <span class="file-icon">${f.type === 'stem' ? '🎚️' : '🎵'}</span>
+              <span class="file-name-text">${esc(f.name)}</span>
+              ${f.type === 'stem' ? '<span class="stem-badge">stem</span>' : ''}
+            </div>
+            <div class="file-actions">
+              <a class="player-btn" href="/player/${f.path.split('/').map(encodeURIComponent).join('/')}">Open in Player</a>
+              <a class="save-btn" href="${href}" download>Save</a>
+              <button class="del-btn" onclick="deleteFile('${esc(f.path)}', this)" title="Delete">🗑</button>
+            </div>
+          </li>`;
+      }).join('');
+
+    } catch (err) { console.error('loadFiles:', err); }
+  }
+
+  async function deleteFile(path, btn) {
+    if (!confirm('Delete this file?')) return;
+    try {
+      await fetch('/files/' + path.split('/').map(encodeURIComponent).join('/'),
+                  { method: 'DELETE' });
+      loadFiles();
+    } catch (err) { alert('Could not delete the file.'); }
+  }
+
+  async function deleteAllStems() {
+    if (!confirm('Delete all stem files? This cannot be undone.')) return;
+    try {
+      await fetch('/stems', { method: 'DELETE' });
+      loadFiles();
+    } catch (err) { alert('Could not delete stems.'); }
+  }
+
+  // Load file list on page open
+  loadFiles();
+</script>
+</body>
+</html>

@@ -454,7 +454,7 @@
             <div class="file-actions">
               <a class="player-btn" href="/player/${f.path.split('/').map(encodeURIComponent).join('/')}">Open in Player</a>
               <a class="save-btn" href="${href}" download>Save</a>
-              <button class="del-btn" onclick="deleteFile('${esc(f.path)}', this)" title="Delete">🗑</button>
+              <button class="del-btn" data-path="${esc(f.path)}" onclick="deleteFile(this.dataset.path, this)" title="Delete">🗑</button>
             </div>
           </li>`;
       }).join('');

@@ -9,46 +9,69 @@ A web-based application to download audio from various sources and optionally sp
 - **Web Interface**: Easy-to-use browser interface for managing downloads and playing back results.
 - **Stem Player**: Integrated player for listening to individual stems.
 
-## Prerequisites
+## Setup & Running
 
+### Option 1: Running with Docker (Recommended)
+
+Docker is the easiest way to run the application since it automatically packages all system dependencies (like FFmpeg) and Python packages (like PyTorch and Demucs).
+
+1. **Start the application**:
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Access the web interface**:
+   Open `http://localhost:5050` in your web browser.
+
+3. **Stop the application**:
+   ```bash
+   docker compose down
+   ```
+
+#### Persistence & Volumes
+- **Downloads**: The `./downloads` directory on your host is mounted to the container. All downloaded tracks and separated stems will appear there automatically.
+- **Model Cache**: Pre-trained Demucs weights are stored in a named Docker volume (`model_cache`) so they aren't redownloaded when starting or rebuilding the container.
+
+---
+
+### Option 2: Running Locally
+
+#### Prerequisites
 - Python 3.8 or higher
 - FFmpeg (required for `yt-dlp` and `demucs`)
 
-## Installation
+#### Installation & Setup
 
 1. **Clone the repository**:
-
    ```bash
    git clone https://github.com/aviatorcards/StemSplitAudio
    cd StemSplitAudio
    ```
 
-2. **Install dependencies**:
-
+2. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Install FFmpeg** (if not already installed):
+3. **Install FFmpeg**:
    - **Ubuntu/Debian**: `sudo apt install ffmpeg`
    - **macOS**: `brew install ffmpeg`
    - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
 
-## Running the Application
+#### Running
 
-You can start the application using the provided script:
-
+Start the application using the convenience script:
 ```bash
 ./start.sh
 ```
 
-Or run it directly with Python:
-
+Or run it directly:
 ```bash
 python3 app.py
 ```
 
 The application will be available at `http://localhost:5050`.
+
 
 ## Usage
 

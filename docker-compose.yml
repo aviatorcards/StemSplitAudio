@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  stemsplit:
+    build: .
+    container_name: stemsplit-audio
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./downloads:/app/downloads
+      - model_cache:/root/.cache
+    restart: unless-stopped
+
+volumes:
+  model_cache:
